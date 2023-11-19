@@ -8,7 +8,6 @@ from matplotlib.colors import ListedColormap
 import lmfit
 from tqdm.notebook import tqdm
 
-
 class load_input():
     def __init__(self, dir=None):
         if dir is None:
