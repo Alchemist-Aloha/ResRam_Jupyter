@@ -1,0 +1,13 @@
+E00 = 13791.293582582848 cm-1 
+gamma = 745.8371404799508 cm-1 
+theta = 1.0644592278061937 cm-1 
+M = 1.3199666526335494 Angstroms 
+n = 1.33
+T = 298.0 Kelvin 
+solvent reorganization energy = 256.08898546131684 cm-1 
+internal reorganization energy = 817.1318247668644 cm-1 
+reorganization energy = 1073.220810228181 cm-1 
+
+Boltzmann averaged states and their corresponding weights 
+0
+<function boltz_states at 0x00000233B43D5300>

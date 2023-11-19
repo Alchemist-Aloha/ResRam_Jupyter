@@ -1,0 +1,13 @@
+E00 = tensor(17250., device='cuda:0') cm-1 
+gamma = tensor([820.9520], device='cuda:0', requires_grad=True) cm-1 
+theta = tensor(1., device='cuda:0') cm-1 
+M = tensor([2.4208], device='cuda:0', requires_grad=True) Angstroms 
+n = tensor(1.3300, device='cuda:0')
+T = tensor(298., device='cuda:0') Kelvin 
+solvent reorganization energy = tensor(178.9541, device='cuda:0') cm-1 
+internal reorganization energy = tensor(392.5031, device='cuda:0', dtype=torch.float64) cm-1 
+reorganization energy = tensor(571.4572, device='cuda:0', dtype=torch.float64) cm-1 
+
+Boltzmann averaged states and their corresponding weights 
+0
+<function boltz_states at 0x0000020D8E2CDF80>

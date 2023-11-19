@@ -1,0 +1,16 @@
+391.3278649694936 # gamma linewidth parameter (cm^-1)
+1.3906864243684307 # theta static inhomogeneous linewidth parameter (cm^-1)
+13638.628782796899 # E0 (cm^-1)
+0.12857745550410982 # kappa solvent parameter
+0.0002 # time step (ps)
+500.0 # number of time steps
+20000.0 # range plus and minus E0 to calculate lineshapes
+2.7131714850508404 # transition length M (Angstroms)
+1.33 # refractive index n
+0 # start raman shift axis (cm^-1)
+2500 # end raman shift axis (cm^-1)
+2 # rshift axis step size (cm^-1)
+20 # raman spectrum resolution (cm^-1)
+298.0 # Temperature (K)
+1 # convergence for sums # no effect since order > 1 broken
+0 # Boltz Toggle
