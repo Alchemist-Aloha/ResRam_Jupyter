@@ -335,7 +335,7 @@ def cross_sections(obj):
             integ_r[l, :] = np.trapz(K_r[l, :, :], axis=1)
             raman_cross[l, :] = obj.preR*obj.convEL*(obj.convEL-obj.wg[l])**3*np.convolve(
                 integ_r[l, :]*np.conj(integ_r[l, :]), np.real(H), 'valid')/(np.sum(H))
-        elif order > 1:
+        elif obj.order > 1:
             raman_cross[l, :] = obj.preR*obj.convEL*(obj.convEL-obj.wg[l])**3*np.convolve(
                 integ_r[l, :], np.real(H), 'valid')/(np.sum(H))
 
