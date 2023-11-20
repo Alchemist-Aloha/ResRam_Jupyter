@@ -1,5 +1,6 @@
 tests/resources/PE2017
 torch_version/
+test.ipynb
 # Do not ship old c_matrix*.c files, due to
 # compatibility problems with newer numpy versions
 *.c
