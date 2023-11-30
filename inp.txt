@@ -2,8 +2,8 @@
 1.0 # theta static inhomogeneous linewidth parameter (cm^-1)
 17250.0 # E0 (cm^-1)
 0.1 # kappa solvent parameter
-0.0002 # time step (ps)
-500.0 # number of time steps
+0.0005 # time step (ps)
+150.0 # number of time steps
 20000.0 # range plus and minus E0 to calculate lineshapes
 1.8087809922025966 # transition length M (Angstroms)
 1.33 # refractive index n
