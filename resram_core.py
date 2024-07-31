@@ -10,7 +10,10 @@ from tqdm.notebook import tqdm
 import time
 import multiprocessing
 
+
 class load_input():
+    '''Class to load input files and calculate parameters'''
+
     def __init__(self, dir=None):
         if dir is None:
             # Set default directory as empty if none provided
@@ -42,10 +45,12 @@ class load_input():
     def inp_txt(self):
         try:
             with open(self.dir + 'inp.txt', 'r') as i:
-                self.inp = [l.partition('#')[0].rstrip() for l in i.readlines()]
+                self.inp = [l.partition('#')[0].rstrip()
+                            for l in i.readlines()]
         except:
             with open(self.dir + 'inp_new.txt', 'r') as i:
-                self.inp = [l.partition('#')[0].rstrip() for l in i.readlines()]
+                self.inp = [l.partition('#')[0].rstrip()
+                            for l in i.readlines()]
         # Constants and parameters from inp.txt
         self.hbar = 5.3088  # plancks constant cm^-1*ps
         self.T = float(self.inp[13])  # Temperature K
@@ -72,7 +77,7 @@ class load_input():
             (2.355+1.76*self.k)  # D parameter
         self.L = self.k*self.D  # LAMBDA parameter
 
-        '''can be moved to save()'''
+        # can be moved to save()
         self.s_reorg = self.beta * \
             (self.L/self.k)**2/2  # reorganization energy cm^-1
         # internal reorganization energy
@@ -89,7 +94,7 @@ class load_input():
         self.EL_reach = float(self.inp[6])
         # range for spectra cm^-1
         self.EL = np.linspace(self.E0-self.EL_reach,
-                                self.E0+self.EL_reach, 1000)
+                              self.E0+self.EL_reach, 1000)
         # static inhomogeneous convolution range
         self.E0_range = np.linspace(-self.EL_reach *
                                     0.5, self.EL_reach*0.5, 501)
@@ -104,7 +109,7 @@ class load_input():
         self.tm = np.append(-np.flip(self.tp[1:], axis=0), self.tp)
         # Excitation axis after convolution with inhomogeneous distribution
         self.convEL = np.linspace(self.E0-self.EL_reach*0.5, self.E0+self.EL_reach*0.5,
-                                    (max(len(self.E0_range), len(self.EL))-min(len(self.E0_range), len(self.EL))+1))
+                                  (max(len(self.E0_range), len(self.EL))-min(len(self.E0_range), len(self.EL))+1))
 
         self.M = float(self.inp[7])  # Transition dipole length angstroms
         self.n = float(self.inp[8])  # Refractive index
@@ -115,10 +120,10 @@ class load_input():
         # for rps, rpump in enumerate(self.rpumps):
         #     # Calculate absolute differences between rpump and convEL
         #     diffs = np.abs(self.convEL - rpump)
-            
+
         #     # Find the index of the minimum difference
         #     min_index = np.argmin(diffs)
-            
+
         #     # Update self.rp with the index of the minimum difference
         #     self.rp[rps] = min_index
         diffs = np.abs(self.convEL[:, np.newaxis] - self.rpumps)
@@ -139,7 +144,7 @@ class load_input():
                 self.state = 0
             else:
                 self.state = min(range(len(self.boltz_coef)),
-                                    key=lambda j: abs(self.boltz_coef[j]-self.convergence))
+                                 key=lambda j: abs(self.boltz_coef[j]-self.convergence))
 
             if self.state == 0:
                 self.order = 1
@@ -155,7 +160,7 @@ class load_input():
 
         # wq = None
         # wq = np.append(wg,wg)
-        
+
         ## Prefactors for absorption and Raman cross-sections ##
         if self.order == 1:
             # (0.3/pi) puts it in differential cross section
@@ -165,8 +170,7 @@ class load_input():
 
         self.preA = ((5.744e-3)/self.n)*self.ts
         self.preF = self.preA*self.n**2
-        
-        
+
     def boltz_states(self):
         wg = self.wg.astype(int)
         cutoff = range(int(self.cutoff))
@@ -203,15 +207,17 @@ class load_input():
         np.reshape(states, -1, len(cutoff))
 
         return states, boltz_dist/norm, dos_energy
-    
 
-def g(t,obj):
-     # Calculate the function g using the calculated parameters
-    g = ((obj.D/obj.L)**2)*(obj.L*t-1+np.exp(-obj.L*t))+1j*((obj.beta*obj.D**2)/(2*obj.L))*(1-np.exp(-obj.L*t))
+
+def g(t, obj):
+    # Calculate the function g using the calculated parameters
+    g = ((obj.D/obj.L)**2)*(obj.L*t-1+np.exp(-obj.L*t))+1j * \
+        ((obj.beta*obj.D**2)/(2*obj.L))*(1-np.exp(-obj.L*t))
     # g = p.gamma*np.abs(t)#
     return g
 
-#old A function
+
+# old A function
 """ def A(t,obj):
     # K=np.zeros((len(p.wg),len(t)),dtype=complex)
     # Initialize K matrix based on the type of t provided
@@ -226,6 +232,7 @@ def g(t,obj):
     # Calculate the function A based on the K matrix
     A = obj.M**2*np.exp(-np.sum(K, axis=0))
     return A """
+
 
 def A(t, obj):
     # Initialize K matrix based on the type of t provided
@@ -244,7 +251,8 @@ def A(t, obj):
     A = obj.M**2 * np.exp(-np.sum(K, axis=0))
     return A
 
-#old R function
+
+# old R function
 """ def R(t1, t2,obj):
     # Initialize Ra and R arrays for calculations
     Ra = np.zeros((len(obj.a), len(obj.wg), len(obj.wg), len(obj.EL)), dtype=complex)
@@ -273,10 +281,12 @@ def A(t, obj):
                         1-np.exp(1j*wg*t2)))**(a+l))*(eta*S*(1-np.exp(1j*wg*t1))*(1-np.exp(-1j*wg*t2)))**(a)
                 R[idxq, idxl, :] = np.sum(Ra[:, idxq, idxl, :], axis=0)
     return np.prod(R, axis=1) """
-    
+
+
 def R(t1, t2, obj):
     # Initialize Ra and R arrays for calculations
-    Ra = np.zeros((len(obj.a), len(obj.Q), len(obj.wg), len(obj.EL)), dtype=complex)
+    Ra = np.zeros((len(obj.a), len(obj.Q), len(
+        obj.wg), len(obj.EL)), dtype=complex)
     R = np.zeros((len(obj.Q), len(obj.wg), len(obj.EL)), dtype=complex)
 
     # Create meshgrid of indices for efficient indexing
@@ -300,7 +310,8 @@ def R(t1, t2, obj):
              (eta * S * (1 - np.exp(1j * wg * t1)) * (1 - np.exp(-1j * wg * t2))) ** (obj.a - obj.Q[:, np.newaxis, np.newaxis])),
             (((1. / (factorial(obj.a) * factorial(obj.a + obj.Q[:, np.newaxis, np.newaxis])))) *
              (((1 + eta) * S * (1 - np.exp(-1j * wg * t1)) * (1 - np.exp(1j * wg * t2))) ** (obj.a + obj.Q[:, np.newaxis, np.newaxis]))) *
-             (eta * S * (1 - np.exp(1j * wg * t1)) * (1 - np.exp(-1j * wg * t2))) ** obj.a
+            (eta * S * (1 - np.exp(1j * wg * t1))
+             * (1 - np.exp(-1j * wg * t2))) ** obj.a
         )
     )
 
@@ -314,11 +325,13 @@ def cross_sections(obj):
     obj.S = (obj.delta**2)/2  # calculate in cross_sections()
     sqrt2 = np.sqrt(2)
     # Calculate parameters D and L based on obj attributes
-    obj.D = obj.gamma*(1+0.85*obj.k+0.88*obj.k**2)/(2.355+1.76*obj.k)  # D parameter
+    obj.D = obj.gamma*(1+0.85*obj.k+0.88*obj.k**2) / \
+        (2.355+1.76*obj.k)  # D parameter
     obj.L = obj.k*obj.D  # LAMBDA parameter
-    obj.EL = np.linspace(obj.E0-obj.EL_reach, obj.E0+obj.EL_reach, 1000)  # range for spectra cm^-1
+    obj.EL = np.linspace(obj.E0-obj.EL_reach, obj.E0 +
+                         obj.EL_reach, 1000)  # range for spectra cm^-1
     obj.convEL = np.linspace(obj.E0-obj.EL_reach*0.5, obj.E0+obj.EL_reach*0.5,
-                                (max(len(obj.E0_range), len(obj.EL))-min(len(obj.E0_range), len(obj.EL))+1))
+                             (max(len(obj.E0_range), len(obj.EL))-min(len(obj.E0_range), len(obj.EL))+1))
     q_r = np.ones((len(obj.wg), len(obj.wg), len(obj.th)), dtype=complex)
     K_r = np.zeros((len(obj.wg), len(obj.EL), len(obj.th)), dtype=complex)
     # elif p.order > 1:
@@ -330,12 +343,14 @@ def cross_sections(obj):
     if obj.theta == 0.0:
         H = 1.  # np.ones(len(p.E0_range))
     else:
-        H = (1/(obj.theta*np.sqrt(2*np.pi)))*np.exp(-((obj.E0_range)**2)/(2*obj.theta**2))
+        H = (1/(obj.theta*np.sqrt(2*np.pi))) * \
+            np.exp(-((obj.E0_range)**2)/(2*obj.theta**2))
 
     thth, ELEL = np.meshgrid(obj.th, obj.EL, sparse=True)
 
-    K_a = np.exp(1j*(ELEL-(obj.E0))*thth-g(thth,obj))*A(thth,obj)
-    K_f = np.exp(1j*(ELEL-(obj.E0))*thth-np.conj(g(thth,obj)))*np.conj(A(thth,obj))
+    K_a = np.exp(1j*(ELEL-(obj.E0))*thth-g(thth, obj))*A(thth, obj)
+    K_f = np.exp(1j*(ELEL-(obj.E0))*thth-np.conj(g(thth, obj))) * \
+        np.conj(A(thth, obj))
 
     ## If the order desired is 1 use the simple first order approximation ##
     if obj.order == 1:
@@ -347,10 +362,7 @@ def cross_sections(obj):
                 elif q[idxl] < 0:
                     q_r[idxq, idxl, :] = np.sqrt(1./factorial(np.abs(q[idxl])))*(((obj.eta[l])**(
                         0.5)*obj.delta[l])/sqrt2)**(-q[idxl])*(1-np.exp(1j*obj.wg[idxl]*thth))**(-q[idxl])
-            K_r[idxq, :, :] = K_a*(np.prod(q_r, axis=1)[idxq]) 
-            
-            
-        
+            K_r[idxq, :, :] = K_a*(np.prod(q_r, axis=1)[idxq])
 
     # If the order is greater than 1, carry out the sums R and compute the full double integral
     ##### Higher order is still broken, need to fix #####
@@ -397,7 +409,6 @@ def cross_sections(obj):
             raman_cross[idx, :] = obj.preR * obj.convEL * (obj.convEL - wg_value)**3 \
                 * np.convolve(integ_r, np.real(H), 'valid') / np.sum(H)
     # Calculate integral using trapezoidal rule along axis 1
-    
 
     # plt.plot(p.convEL,fl_cross)
     # plt.plot(p.convEL,abs_cross)
@@ -413,7 +424,6 @@ def cross_sections(obj):
     return abs_cross, fl_cross, raman_cross, obj.boltz_state, obj.boltz_coef
 
 
-
 def run_save(obj):
     global current_time_str
     abs_cross, fl_cross, raman_cross, boltz_states, boltz_coef = cross_sections(
@@ -424,8 +434,8 @@ def run_save(obj):
     current_time = datetime.now()
     current_time_str = current_time.strftime("%Y%m%d_%H-%M-%S")
 
-    for i,rp in enumerate(obj.rp):
-        for l,wg in enumerate(obj.wg):
+    for i, rp in enumerate(obj.rp):
+        for l, wg in enumerate(obj.wg):
             raman_spec[:, i] += np.real((raman_cross[l, rp])) * \
                 (1/np.pi)*(0.5*obj.res)/((obj.rshift-wg)**2+(0.5*obj.res)**2)
 
@@ -449,7 +459,8 @@ def run_save(obj):
     os.mkdir('./'+current_time_str + '_data')
 
     obj.s_reorg = obj.beta*(obj.L/obj.k)**2/2  # reorganization energy cm^-1
-    obj.w_reorg = 0.5*np.sum((obj.delta)**2*obj.wg)  # internal reorganization energy
+    # internal reorganization energy
+    obj.w_reorg = 0.5*np.sum((obj.delta)**2*obj.wg)
     obj.reorg = obj.w_reorg + obj.s_reorg  # Total reorganization energy
     np.set_printoptions(threshold=sys.maxsize)
     np.savetxt(current_time_str + "_data/profs.dat",
@@ -535,15 +546,18 @@ class resram_data:
     def __init__(self, input=None):
         if input is None:
             self.obj = load_input()
-            abs_cross,fl_cross,raman_cross,boltz_state,boltz_coef  = cross_sections(self.obj)
-            self.raman_spec = np.zeros((len(self.obj.rshift), len(self.obj.rpumps)))
-            for i,rp in enumerate(self.obj.rp):
-                for l,wg in enumerate(self.obj.wg):
+            abs_cross, fl_cross, raman_cross, boltz_state, boltz_coef = cross_sections(
+                self.obj)
+            self.raman_spec = np.zeros(
+                (len(self.obj.rshift), len(self.obj.rpumps)))
+            for i, rp in enumerate(self.obj.rp):
+                for l, wg in enumerate(self.obj.wg):
                     self.raman_spec[:, i] += np.real((raman_cross[l, rp])) * \
-                    (1/np.pi)*(0.5*self.obj.res)/((self.obj.rshift-wg)**2+(0.5*self.obj.res)**2)
+                        (1/np.pi)*(0.5*self.obj.res) / \
+                        ((self.obj.rshift-wg)**2+(0.5*self.obj.res)**2)
             self.fl = np.real(fl_cross)
             self.abs = np.real(abs_cross)
-            
+
             self.EL = self.obj.convEL
             self.filename = None
             self.wg = self.obj.wg
@@ -551,13 +565,13 @@ class resram_data:
             self.delta = self.obj.delta
             self.rshift = self.obj.rshift
             self.profs = np.real(np.transpose(raman_cross))
-            #self.inp = np.loadtxt(input+'inp.dat')
+            # self.inp = np.loadtxt(input+'inp.dat')
             self.M = self.obj.M
             self.gamma = self.obj.gamma
             self.theta = self.obj.theta
             self.E0 = self.obj.E0
             self.kappa = self.obj.k
-            self.n = self.obj.n 
+            self.n = self.obj.n
             try:
                 self.abs_exp = self.obj.abs_exp
             except:
@@ -567,7 +581,7 @@ class resram_data:
                 self.profs_exp = self.obj.profs_exp
             except:
                 print('No experimental Raman cross section found in directory/')
-          
+
         else:
             self.filename = input
             self.wg = np.loadtxt(input+'freqs.dat')
@@ -666,41 +680,46 @@ class resram_data:
         self.ax_abs.set_ylabel('Cross Section (1e-14 A**2/Molecule)')
         self.ax_abs.legend(fontsize=8)
         self.fig_abs.show()
-        
-def raman_residual(param,fit_obj=None):
-    global abs_cross,fl_cross,raman_cross
-    global correlation,total_sigma
+
+
+def raman_residual(param, fit_obj=None):
+    global abs_cross, fl_cross, raman_cross
+    global correlation, total_sigma
     # global sigma_list,loss_list,correlation_list
     if fit_obj is None:
         fit_obj = load_input()
     # for i in range(len(fit_obj.delta)):
     #     fit_obj.delta[i] = param.valuesdict()['delta'+str(i)]
-    fit_obj.delta = np.array([param.valuesdict()['delta' + str(i)] for i in np.arange(len(fit_obj.delta))])
+    fit_obj.delta = np.array([param.valuesdict()['delta' + str(i)]
+                             for i in np.arange(len(fit_obj.delta))])
     fit_obj.gamma = param.valuesdict()['gamma']
     fit_obj.M = param.valuesdict()['transition_length']
-    fit_obj.k = param.valuesdict()['kappa'] # kappa parameter
-    fit_obj.theta = param.valuesdict()['theta'] # kappa parameter
-    fit_obj.E0 = param.valuesdict()['E0'] # kappa parameter
-    #print(delta,gamma,M,k,theta,E0)
-    abs_cross,fl_cross,raman_cross,boltz_state,boltz_coef  = cross_sections(fit_obj)
-    correlation = (np.corrcoef(np.real(abs_cross), fit_obj.abs_exp[:,1])[0, 1])
-    #print("Correlation of absorption is "+ str(correlation))
-    #Minimize the negative correlation to get better fit
+    fit_obj.k = param.valuesdict()['kappa']  # kappa parameter
+    fit_obj.theta = param.valuesdict()['theta']  # kappa parameter
+    fit_obj.E0 = param.valuesdict()['E0']  # kappa parameter
+    # print(delta,gamma,M,k,theta,E0)
+    abs_cross, fl_cross, raman_cross, boltz_state, boltz_coef = cross_sections(
+        fit_obj)
+    correlation = (np.corrcoef(np.real(abs_cross),
+                   fit_obj.abs_exp[:, 1])[0, 1])
+    # print("Correlation of absorption is "+ str(correlation))
+    # Minimize the negative correlation to get better fit
 
-    if fit_obj.profs_exp.ndim == 1:    #Convert 1D array to 2D
-        fit_obj.profs_exp = np.reshape(fit_obj.profs_exp,(-1,1))
-        #print("Raman cross section expt is converted to a 2D array")
+    if fit_obj.profs_exp.ndim == 1:  # Convert 1D array to 2D
+        fit_obj.profs_exp = np.reshape(fit_obj.profs_exp, (-1, 1))
+        # print("Raman cross section expt is converted to a 2D array")
     sigma = np.zeros_like(fit_obj.delta)
     # Calculate the intermediate expression in vectorized form
-    intermediate = 1e7 * (np.real(raman_cross[:, fit_obj.rp]) - fit_obj.profs_exp)**2
+    intermediate = 1e7 * \
+        (np.real(raman_cross[:, fit_obj.rp]) - fit_obj.profs_exp)**2
 
     # Perform the summation across axis 1 (equivalent to the nested loop)
     sigma += intermediate.sum(axis=1)
 
     total_sigma = np.sum(sigma)
-    #print("Total Raman sigma is "+ str(total_sigma))
-    loss= total_sigma - 100*(correlation - 1)
-    #print(loss)
+    # print("Total Raman sigma is "+ str(total_sigma))
+    loss = total_sigma - 100*(correlation - 1)
+    # print(loss)
     # if loss_list ==[]:
     #     loss_list = [loss]
     # else:
@@ -716,58 +735,59 @@ def raman_residual(param,fit_obj=None):
     return loss, total_sigma, 100*(1-correlation)
 
 
-
-def param_init(fit_switch, obj = None):
+def param_init(fit_switch, obj=None):
     if obj is None:
         obj = load_input()
     params_lmfit = lmfit.Parameters()
     for i in range(len(obj.delta)):
         if fit_switch[i] == 1:
-            params_lmfit.add('delta'+str(i),value=obj.delta[i],min=0.0,max=1.0)
+            params_lmfit.add(
+                'delta'+str(i), value=obj.delta[i], min=0.0, max=1.0)
         else:
-            params_lmfit.add('delta'+str(i),value=obj.delta[i],vary = False)
-    
-    if fit_switch[len(obj.delta)]==1:
-        params_lmfit.add('gamma',value = obj.gamma,min = 0.6*obj.gamma, max = 1.4*obj.gamma)
-    else:
-        params_lmfit.add('gamma',value = obj.gamma,vary = False)
+            params_lmfit.add('delta'+str(i), value=obj.delta[i], vary=False)
 
-    if fit_switch[len(obj.delta)+1]==1:
-        params_lmfit.add('transition_length',value = obj.M,min = 0.8*obj.M, max = 1.2*obj.M)
+    if fit_switch[len(obj.delta)] == 1:
+        params_lmfit.add('gamma', value=obj.gamma, min=0.6 *
+                         obj.gamma, max=1.4*obj.gamma)
     else:
-        params_lmfit.add('transition_length',value = obj.M,vary =False)
+        params_lmfit.add('gamma', value=obj.gamma, vary=False)
 
-    if fit_switch[len(obj.delta)+2]==1:
-        params_lmfit.add('theta',value = obj.theta,min = 0.5*obj.theta, max = 1.5*obj.theta)
+    if fit_switch[len(obj.delta)+1] == 1:
+        params_lmfit.add('transition_length', value=obj.M,
+                         min=0.8*obj.M, max=1.2*obj.M)
     else:
-        params_lmfit.add('theta',value = obj.theta,vary = False)
+        params_lmfit.add('transition_length', value=obj.M, vary=False)
 
-    if fit_switch[len(obj.delta)+3]==1:
-        params_lmfit.add('kappa',value = obj.k,min = 0.9*obj.k, max = 1.1*obj.k)
+    if fit_switch[len(obj.delta)+2] == 1:
+        params_lmfit.add('theta', value=obj.theta, min=0.5 *
+                         obj.theta, max=1.5*obj.theta)
     else:
-        params_lmfit.add('kappa',value = obj.k,vary = False)
+        params_lmfit.add('theta', value=obj.theta, vary=False)
 
-    if fit_switch[len(obj.delta)+5]==1:
-        params_lmfit.add('E0',value = obj.E0,min = 0.95*obj.E0, max = 1.05*obj.E0)
+    if fit_switch[len(obj.delta)+3] == 1:
+        params_lmfit.add('kappa', value=obj.k, min=0.9*obj.k, max=1.1*obj.k)
     else:
-        params_lmfit.add('E0',value = obj.E0,vary = False)
+        params_lmfit.add('kappa', value=obj.k, vary=False)
 
-    #print("Initial parameters: "+ str(params_lmfit))
+    if fit_switch[len(obj.delta)+5] == 1:
+        params_lmfit.add('E0', value=obj.E0, min=0.95*obj.E0, max=1.05*obj.E0)
+    else:
+        params_lmfit.add('E0', value=obj.E0, vary=False)
+
+    # print("Initial parameters: "+ str(params_lmfit))
     return params_lmfit
 
 
-    
 def orca_freq(inp):
     import re
     freq = []
-    with open(inp,"r") as file:
+    with open(inp, "r") as file:
 
         for i in file:
-            #print(re.findall(r"\d+\.\d+(?=\s|$)",i))
-            num = float(re.findall(r"\d+\.\d+(?=\s|$)",i)[0])
+            # print(re.findall(r"\d+\.\d+(?=\s|$)",i))
+            num = float(re.findall(r"\d+\.\d+(?=\s|$)", i)[0])
             freq.append(num)
     print(freq)
-    np.savetxt('freqs.dat',freq)
+    np.savetxt('freqs.dat', freq)
     file.close()
-    return freq   
-
+    return freq
