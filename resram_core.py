@@ -1,16 +1,15 @@
 import sys
+from datetime import datetime
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.special import factorial
-from datetime import datetime
-import os
 from matplotlib.colors import ListedColormap
 import lmfit
-from tqdm.notebook import tqdm
-import time
-import multiprocessing
 
-
+correlation, total_sigma = None
+current_time_str = None
+abs_cross, fl_cross, raman_cross = None
 class load_input():
     '''Class to load input files and calculate parameters'''
 
@@ -544,6 +543,7 @@ def run_save(obj):
 
 class resram_data:
     def __init__(self, input=None):
+        global abs_cross, fl_cross, raman_cross
         if input is None:
             self.obj = load_input()
             abs_cross, fl_cross, raman_cross, boltz_state, boltz_coef = cross_sections(
@@ -553,8 +553,7 @@ class resram_data:
             for i, rp in enumerate(self.obj.rp):
                 for l, wg in enumerate(self.obj.wg):
                     self.raman_spec[:, i] += np.real((raman_cross[l, rp])) * \
-                        (1/np.pi)*(0.5*self.obj.res) / \
-                        ((self.obj.rshift-wg)**2+(0.5*self.obj.res)**2)
+                        (1/np.pi)*(0.5*self.obj.res)/((self.obj.rshift-wg)**2+(0.5*self.obj.res)**2)
             self.fl = np.real(fl_cross)
             self.abs = np.real(abs_cross)
 
