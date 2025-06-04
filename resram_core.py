@@ -7,9 +7,9 @@ from scipy.special import factorial
 from matplotlib.colors import ListedColormap
 import lmfit
 
-correlation, total_sigma = None
-current_time_str = None
-abs_cross, fl_cross, raman_cross = None
+# correlation, total_sigma = None
+# current_time_str = None
+# abs_cross, fl_cross, raman_cross = None
 class load_input():
     '''Class to load input files and calculate parameters'''
 
