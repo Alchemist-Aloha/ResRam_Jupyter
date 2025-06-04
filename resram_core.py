@@ -38,7 +38,7 @@ class load_input():
             print('No experimental Raman cross section found in directory/')
         self.inp_txt()
         self.abs_cross, self.fl_cross, self.raman_cross, self.boltz_state, self.boltz_coef = None, None, None, None, None
-        self.sigma = None  # cross section 
+        self.sigma = np.zeros_like(self.delta)  # cross section 
         self.correlation = None  # correlation function
         self.total_sigma = None  # total cross section
         self.loss = None
@@ -544,7 +544,6 @@ def run_save(obj, current_time_str):
 
 class resram_data:
     def __init__(self, input=None):
-        global abs_cross, fl_cross, raman_cross
         if input is None:
             self.obj = load_input()
             abs_cross, fl_cross, raman_cross, boltz_state, boltz_coef = cross_sections(
