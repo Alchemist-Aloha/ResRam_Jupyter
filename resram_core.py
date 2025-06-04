@@ -7,9 +7,7 @@ from scipy.special import factorial
 from matplotlib.colors import ListedColormap
 import lmfit
 
-# correlation, total_sigma = None
-# current_time_str = None
-# abs_cross, fl_cross, raman_cross = None
+
 class load_input():
     '''Class to load input files and calculate parameters'''
 
@@ -39,6 +37,14 @@ class load_input():
         except:
             print('No experimental Raman cross section found in directory/')
         self.inp_txt()
+        self.abs_cross, self.fl_cross, self.raman_cross, self.boltz_state, self.boltz_coef = None, None, None, None, None
+        self.sigma = None  # cross section 
+        self.correlation = None  # correlation function
+        self.total_sigma = None  # total cross section
+        self.loss = None
+        self.correlation_list = []  # list of correlation functions
+        self.sigma_list = []  # list of cross sections
+        self.loss_list = []  # list of losses
 
     # Function to read input file
     def inp_txt(self):
@@ -337,7 +343,7 @@ def cross_sections(obj):
     # 	K_r = np.zeros((len(p.tm),len(p.tp),len(p.wg),len(p.EL)),dtype=complex)
     integ_r1 = np.zeros((len(obj.tm), len(obj.EL)), dtype=complex)
     integ_r = np.zeros((len(obj.wg), len(obj.EL)), dtype=complex)
-    raman_cross = np.zeros((len(obj.wg), len(obj.convEL)), dtype=complex)
+    obj.raman_cross = np.zeros((len(obj.wg), len(obj.convEL)), dtype=complex)
 
     if obj.theta == 0.0:
         H = 1.  # np.ones(len(p.E0_range))
@@ -369,8 +375,8 @@ def cross_sections(obj):
 
         tpp, tmm, ELEL = np.meshgrid(obj.tp, obj.tm, obj.EL, sparse=True)
         # *A((tpp+tmm)/(np.sqrt(2)))*np.conj(A((tpp-tmm)/(np.sqrt(2))))#*R((tpp+tmm)/(np.sqrt(2)),(tpp-tmm)/(np.sqrt(2)))
-        K_r = np.exp(1j*(ELEL-obj.E0)*sqrt2*tmm-g(tpp+tmm) /
-                     (sqrt2)-np.conj(g((tpp-tmm)/(sqrt2))))
+        K_r = np.exp(1j*(ELEL-obj.E0)*sqrt2*tmm-g(tpp+tmm,obj) /
+                     (sqrt2)-np.conj(g((tpp-tmm)/(sqrt2),obj)))
 
         for idxtm, tm in enumerate(obj.tm, start=0):
             integ_r1[idxtm, :] = np.trapz(
@@ -380,11 +386,11 @@ def cross_sections(obj):
     ######################################################
 
     integ_a = np.trapz(K_a, axis=1)
-    abs_cross = obj.preA*obj.convEL * \
+    obj.abs_cross = obj.preA*obj.convEL * \
         np.convolve(integ_a, np.real(H), 'valid')/(np.sum(H))
 
     integ_f = np.trapz(K_f, axis=1)
-    fl_cross = obj.preF*obj.convEL * \
+    obj.fl_cross = obj.preF*obj.convEL * \
         np.convolve(integ_f, np.real(H), 'valid')/(np.sum(H))
 
     # plt.plot(p.convEL,abs_cross)
@@ -401,11 +407,11 @@ def cross_sections(obj):
     for idx, wg_value in enumerate(obj.wg):
         if obj.order == 1:
             integ_r = np.trapz(K_r[idx, :, :], axis=1)
-            raman_cross[idx, :] = obj.preR * obj.convEL * (obj.convEL - wg_value)**3 \
+            obj.raman_cross[idx, :] = obj.preR * obj.convEL * (obj.convEL - wg_value)**3 \
                 * np.convolve(integ_r * np.conj(integ_r), np.real(H), 'valid') / np.sum(H)
         elif obj.order > 1:
             integ_r = np.trapz(K_r[idx, :, :], axis=1)
-            raman_cross[idx, :] = obj.preR * obj.convEL * (obj.convEL - wg_value)**3 \
+            obj.raman_cross[idx, :] = obj.preR * obj.convEL * (obj.convEL - wg_value)**3 \
                 * np.convolve(integ_r, np.real(H), 'valid') / np.sum(H)
     # Calculate integral using trapezoidal rule along axis 1
 
@@ -420,18 +426,13 @@ def cross_sections(obj):
     # plt.show()
     # exit()
 
-    return abs_cross, fl_cross, raman_cross, obj.boltz_state, obj.boltz_coef
+    return obj.abs_cross, obj.fl_cross, obj.raman_cross, obj.boltz_state, obj.boltz_coef
 
 
-def run_save(obj):
-    global current_time_str
+def run_save(obj, current_time_str):
     abs_cross, fl_cross, raman_cross, boltz_states, boltz_coef = cross_sections(
         obj)
     raman_spec = np.zeros((len(obj.rshift), len(obj.rpumps)))
-
-    # get current time as YYMMDD_HH-MM-SS
-    current_time = datetime.now()
-    current_time_str = current_time.strftime("%Y%m%d_%H-%M-%S")
 
     for i, rp in enumerate(obj.rp):
         for l, wg in enumerate(obj.wg):
@@ -682,8 +683,8 @@ class resram_data:
 
 
 def raman_residual(param, fit_obj=None):
-    global abs_cross, fl_cross, raman_cross
-    global correlation, total_sigma
+    # global abs_cross, fl_cross, raman_cross
+    # global correlation, total_sigma
     # global sigma_list,loss_list,correlation_list
     if fit_obj is None:
         fit_obj = load_input()
@@ -697,9 +698,8 @@ def raman_residual(param, fit_obj=None):
     fit_obj.theta = param.valuesdict()['theta']  # kappa parameter
     fit_obj.E0 = param.valuesdict()['E0']  # kappa parameter
     # print(delta,gamma,M,k,theta,E0)
-    abs_cross, fl_cross, raman_cross, boltz_state, boltz_coef = cross_sections(
-        fit_obj)
-    correlation = (np.corrcoef(np.real(abs_cross),
+    cross_sections(fit_obj)
+    fit_obj.correlation = (np.corrcoef(np.real(fit_obj.abs_cross),
                    fit_obj.abs_exp[:, 1])[0, 1])
     # print("Correlation of absorption is "+ str(correlation))
     # Minimize the negative correlation to get better fit
@@ -707,31 +707,31 @@ def raman_residual(param, fit_obj=None):
     if fit_obj.profs_exp.ndim == 1:  # Convert 1D array to 2D
         fit_obj.profs_exp = np.reshape(fit_obj.profs_exp, (-1, 1))
         # print("Raman cross section expt is converted to a 2D array")
-    sigma = np.zeros_like(fit_obj.delta)
+    fit_obj.sigma = np.zeros_like(fit_obj.delta)
     # Calculate the intermediate expression in vectorized form
     intermediate = 1e7 * \
-        (np.real(raman_cross[:, fit_obj.rp]) - fit_obj.profs_exp)**2
+        (np.real(fit_obj.raman_cross[:, fit_obj.rp]) - fit_obj.profs_exp)**2
 
     # Perform the summation across axis 1 (equivalent to the nested loop)
-    sigma += intermediate.sum(axis=1)
+    fit_obj.sigma += intermediate.sum(axis=1)
 
-    total_sigma = np.sum(sigma)
+    fit_obj.total_sigma = np.sum(fit_obj.sigma)
     # print("Total Raman sigma is "+ str(total_sigma))
-    loss = total_sigma - 100*(correlation - 1)
+    fit_obj.loss = fit_obj.total_sigma - 100*(fit_obj.correlation - 1)
     # print(loss)
-    # if loss_list ==[]:
-    #     loss_list = [loss]
-    # else:
-    #     loss_list.append(loss)
-    # if correlation_list ==[]:
-    #     correlation_list = [correlation]
-    # else:
-    #     correlation_list.append(correlation)
-    # if sigma_list ==[]:
-    #     sigma_list = [total_sigma]
-    # else:
-    #     sigma_list.append(total_sigma)
-    return loss, total_sigma, 100*(1-correlation)
+    if fit_obj.loss_list ==[]:
+        fit_obj.loss_list = [fit_obj.loss]
+    else:
+        fit_obj.loss_list.append(fit_obj.loss)
+    if fit_obj.correlation_list ==[]:
+        fit_obj.correlation_list = [fit_obj.correlation]
+    else:
+        fit_obj.correlation_list.append(fit_obj.correlation)
+    if fit_obj.sigma_list ==[]:
+        fit_obj.sigma_list = [fit_obj.total_sigma]
+    else:
+        fit_obj.sigma_list.append(fit_obj.total_sigma)
+    return fit_obj.loss, fit_obj.total_sigma, 100*(1-fit_obj.correlation)
 
 
 def param_init(fit_switch, obj=None):
