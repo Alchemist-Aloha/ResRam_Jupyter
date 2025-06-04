@@ -584,16 +584,16 @@ class resram_data:
 
         else:
             self.filename = input
-            self.wg = np.loadtxt(input+'freqs.dat')
-            self.rpumps = np.loadtxt(input+'rpumps.dat')
-            self.delta = np.loadtxt(input+'deltas.dat')
-            self.abs = np.loadtxt(input+'Abs.dat')
-            self.EL = np.loadtxt(input+'EL.dat')
-            self.fl = np.loadtxt(input+'Fl.dat')
-            self.raman_spec = np.loadtxt(input+'raman_spec.dat')
-            self.rshift = np.loadtxt(input+'rshift.dat')
-            self.profs = np.loadtxt(input+'profs.dat')
-            self.inp = np.loadtxt(input+'inp.dat')
+            self.wg = np.loadtxt(input+'/freqs.dat')
+            self.rpumps = np.loadtxt(input+'/rpumps.dat')
+            self.delta = np.loadtxt(input+'/deltas.dat')
+            self.abs = np.loadtxt(input+'/Abs.dat')
+            self.EL = np.loadtxt(input+'/EL.dat')
+            self.fl = np.loadtxt(input+'/Fl.dat')
+            self.raman_spec = np.loadtxt(input+'/raman_spec.dat')
+            self.rshift = np.loadtxt(input+'/rshift.dat')
+            self.profs = np.loadtxt(input+'/profs.dat')
+            self.inp = np.loadtxt(input+'/inp.dat')
             self.M = self.inp[7]
             self.gamma = self.inp[0]
             self.theta = self.inp[1]
