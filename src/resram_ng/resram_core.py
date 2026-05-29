@@ -31,11 +31,21 @@ from scipy.special import factorial
 from matplotlib.colors import ListedColormap
 import lmfit
 
-try:
-    import resram_rust
-    HAS_RUST = True
-except ImportError:
+if os.environ.get("RESRAM_DISABLE_RUST", "").lower() in {"1", "true", "yes", "on"}:
+    resram_rust = None
     HAS_RUST = False
+else:
+    try:
+        import resram_rust
+        HAS_RUST = all(
+            hasattr(resram_rust, name)
+            for name in ("cross_sections_rust", "raman_residual_rust")
+        )
+        if not HAS_RUST:
+            resram_rust = None
+    except (ImportError, OSError):
+        resram_rust = None
+        HAS_RUST = False
 
 
 def get_default_example_dir() -> str:
@@ -126,26 +136,22 @@ class load_input:
 
         # Load experimental spectra if available
         try:
-            abs_exp_orig = np.loadtxt(self.dir + "abs_exp.dat")
-            if abs_exp_orig[0, 0] > abs_exp_orig[-1, 0]:
+            self.abs_exp_raw = np.loadtxt(self.dir + "abs_exp.dat")
+            if self.abs_exp_raw[0, 0] > self.abs_exp_raw[-1, 0]:
                 print("Experimental absorption spectrum appears to be inverted.")
-                abs_exp_orig[:, 0] = abs_exp_orig[::-1, 0]
-                abs_exp_orig[:, 1] = abs_exp_orig[::-1, 1]
-            abs_spec_interp = np.interp(
-                self.convEL, abs_exp_orig[:, 0], abs_exp_orig[:, 1]
-            )
-            self.abs_exp = np.stack((self.convEL, abs_spec_interp), axis=0).T
+                self.abs_exp_raw[:, 0] = self.abs_exp_raw[::-1, 0]
+                self.abs_exp_raw[:, 1] = self.abs_exp_raw[::-1, 1]
+            self.update_abs_exp_interpolant()
         except Exception:
             print("No experimental absorption spectrum found in directory/")
 
         try:
-            fl_exp_orig = np.loadtxt(self.dir + "fl_exp.dat")
-            if fl_exp_orig[0, 0] > fl_exp_orig[-1, 0]:
+            self.fl_exp_raw = np.loadtxt(self.dir + "fl_exp.dat")
+            if self.fl_exp_raw[0, 0] > self.fl_exp_raw[-1, 0]:
                 print("Experimental fluorescence spectrum appears to be inverted.")
-                fl_exp_orig[:, 0] = fl_exp_orig[::-1, 0]
-                fl_exp_orig[:, 1] = fl_exp_orig[::-1, 1]
-            fl_exp_interp = np.interp(self.convEL, fl_exp_orig[:, 0], fl_exp_orig[:, 1])
-            self.fl_exp = np.stack((self.convEL, fl_exp_interp), axis=0).T
+                self.fl_exp_raw[:, 0] = self.fl_exp_raw[::-1, 0]
+                self.fl_exp_raw[:, 1] = self.fl_exp_raw[::-1, 1]
+            self.update_fl_exp_interpolant()
         except Exception:
             print("No experimental fluorescence spectrum found in directory/")
 
@@ -169,6 +175,25 @@ class load_input:
         self.correlation_list = []
         self.sigma_list = []
         self.loss_list = []
+
+    def update_abs_exp_interpolant(self):
+        """Refresh absorption data interpolated onto the current calculation grid."""
+        abs_spec_interp = np.interp(
+            self.convEL, self.abs_exp_raw[:, 0], self.abs_exp_raw[:, 1]
+        )
+        self.abs_exp = np.stack((self.convEL, abs_spec_interp), axis=0).T
+
+    def update_fl_exp_interpolant(self):
+        """Refresh fluorescence data interpolated onto the current calculation grid."""
+        fl_exp_interp = np.interp(self.convEL, self.fl_exp_raw[:, 0], self.fl_exp_raw[:, 1])
+        self.fl_exp = np.stack((self.convEL, fl_exp_interp), axis=0).T
+
+    def update_experimental_interpolants(self):
+        """Refresh experimental interpolants after the calculation grid changes."""
+        if hasattr(self, "abs_exp_raw"):
+            self.update_abs_exp_interpolant()
+        if hasattr(self, "fl_exp_raw"):
+            self.update_fl_exp_interpolant()
 
     def inp_txt(self):
         """

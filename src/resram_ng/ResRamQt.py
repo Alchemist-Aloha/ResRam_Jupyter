@@ -236,6 +236,9 @@ class SpectrumApp(QMainWindow):
         self.load_files()
         self.plot_switch = np.ones(len(self.obj_load.delta) + 18)
         self.fit_switch = np.ones(len(self.obj_load.delta) + 18)
+        self.fit_alg = "powell"
+        self.maxnfev = 100
+        self.tolerance = 0.00000001
         self.setWindowTitle("Raman Spectrum Analyzer")
         self.setGeometry(100, 100, 960, 540)
         
@@ -340,178 +343,13 @@ class SpectrumApp(QMainWindow):
     def sendto_table(self):
         """Send the data to the table
         """
-        self.table_widget.itemChanged.disconnect(self.update_spectrum)
-
-        for row in range(len(self.obj_load.delta)):
-            label = QTableWidgetItem(f"delta@{self.obj_load.wg[row]:.2f} cm-1")
-            self.table_widget.setItem(row, 0, label)
-            self.table_widget.setItem(
-                row, 1, QTableWidgetItem(f"{self.obj_load.delta[row]}")
-            )
-            
-            # Update check states
-            plot_item = self.table_widget.item(row, 2)
-            if plot_item:
-                plot_item.setCheckState(Qt.CheckState.Checked if self.plot_switch[row] == 1 else Qt.CheckState.Unchecked)
-            
-            fit_item = self.table_widget.item(row, 3)
-            if fit_item:
-                fit_item.setCheckState(Qt.CheckState.Checked if self.fit_switch[row] == 1 else Qt.CheckState.Unchecked)
-
-        self.table_widget.setItem(
-            len(self.obj_load.delta), 0, QTableWidgetItem("gamma")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta), 1, QTableWidgetItem(str(self.obj_load.gamma))
-        )
-        gamma_fit = self.table_widget.item(len(self.obj_load.delta), 3)
-        if gamma_fit:
-            gamma_fit.setCheckState(Qt.CheckState.Checked if self.fit_switch[len(self.obj_load.delta)] == 1 else Qt.CheckState.Unchecked)
-
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 1, 0, QTableWidgetItem("Transition Length")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 1, 1, QTableWidgetItem(str(self.obj_load.M))
-        )
-        m_fit = self.table_widget.item(len(self.obj_load.delta) + 1, 3)
-        if m_fit:
-            m_fit.setCheckState(Qt.CheckState.Checked if self.fit_switch[len(self.obj_load.delta) + 1] == 1 else Qt.CheckState.Unchecked)
-
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 2, 0, QTableWidgetItem("theta")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 2, 1, QTableWidgetItem(str(self.obj_load.theta))
-        )
-        theta_fit = self.table_widget.item(len(self.obj_load.delta) + 2, 3)
-        if theta_fit:
-            theta_fit.setCheckState(Qt.CheckState.Checked if self.fit_switch[len(self.obj_load.delta) + 2] == 1 else Qt.CheckState.Unchecked)
-
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 3, 0, QTableWidgetItem("kappa")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 3, 1, QTableWidgetItem(str(self.obj_load.k))
-        )
-        kappa_fit = self.table_widget.item(len(self.obj_load.delta) + 3, 3)
-        if kappa_fit:
-            kappa_fit.setCheckState(Qt.CheckState.Checked if self.fit_switch[len(self.obj_load.delta) + 3] == 1 else Qt.CheckState.Unchecked)
-
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 4, 0, QTableWidgetItem("Refractive Index")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 4, 1, QTableWidgetItem(str(self.obj_load.n))
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 5, 0, QTableWidgetItem("E00")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 5, 1, QTableWidgetItem(str(self.obj_load.E0))
-        )
-        e0_fit = self.table_widget.item(len(self.obj_load.delta) + 5, 3)
-        if e0_fit:
-            e0_fit.setCheckState(Qt.CheckState.Checked if self.fit_switch[len(self.obj_load.delta) + 5] == 1 else Qt.CheckState.Unchecked)
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 6, 0, QTableWidgetItem("Time step (ps)")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 6, 1, QTableWidgetItem(str(self.obj_load.ts))
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 7, 0, QTableWidgetItem("Time step number")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 7, 1, QTableWidgetItem(str(self.obj_load.ntime))
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 11, 0, QTableWidgetItem("Temp (K)")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 11, 1, QTableWidgetItem(str(self.obj_load.T))
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 12, 0, QTableWidgetItem("Raman maxcalc")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 12,
-            1,
-            QTableWidgetItem(str(getattr(self.obj_load, "raman_maxcalc", self.obj_load.inp[10]))),
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 13, 0, QTableWidgetItem("EL reach")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 13,
-            1,
-            QTableWidgetItem(str(getattr(self.obj_load, "EL_reach", self.obj_load.inp[6]))),
-        )
-        self.table_widget.itemChanged.connect(self.update_spectrum)
+        self.render_table_from_state()
         self.plot_data()
 
     def load_table(self):
         """Load the data from the table
         """
-        for i in range(len(self.obj_load.delta)):
-            self.obj_load.delta[i] = float(self.table_widget.item(i, 1).text())
-            self.plot_switch[i] = 1 if self.table_widget.item(i, 2).checkState() == Qt.CheckState.Checked else 0
-            self.fit_switch[i] = 1 if self.table_widget.item(i, 3).checkState() == Qt.CheckState.Checked else 0
-
-        self.obj_load.gamma = float(
-            self.table_widget.item(len(self.obj_load.delta), 1).text()
-        )
-        self.fit_switch[len(self.obj_load.delta)] = 1 if self.table_widget.item(len(self.obj_load.delta), 3).checkState() == Qt.CheckState.Checked else 0
-        
-        self.obj_load.M = float(
-            self.table_widget.item(len(self.obj_load.delta) + 1, 1).text()
-        )
-        self.fit_switch[len(self.obj_load.delta) + 1] = 1 if self.table_widget.item(len(self.obj_load.delta) + 1, 3).checkState() == Qt.CheckState.Checked else 0
-        
-        self.obj_load.theta = float(
-            self.table_widget.item(len(self.obj_load.delta) + 2, 1).text()
-        )  # theta parameter
-        self.fit_switch[len(self.obj_load.delta) + 2] = 1 if self.table_widget.item(len(self.obj_load.delta) + 2, 3).checkState() == Qt.CheckState.Checked else 0
-        
-        self.obj_load.k = float(
-            self.table_widget.item(len(self.obj_load.delta) + 3, 1).text()
-        )  # kappa parameter
-        self.fit_switch[len(self.obj_load.delta) + 3] = 1 if self.table_widget.item(len(self.obj_load.delta) + 3, 3).checkState() == Qt.CheckState.Checked else 0
-        
-        self.obj_load.n = float(
-            self.table_widget.item(len(self.obj_load.delta) + 4, 1).text()
-        )  # refractive index
-        
-        self.obj_load.E0 = float(
-            self.table_widget.item(len(self.obj_load.delta) + 5, 1).text()
-        )  # E00 parameter
-        self.fit_switch[len(self.obj_load.delta) + 5] = 1 if self.table_widget.item(len(self.obj_load.delta) + 5, 3).checkState() == Qt.CheckState.Checked else 0
-        self.obj_load.ts = float(
-            self.table_widget.item(len(self.obj_load.delta) + 6, 1).text()
-        )
-        self.obj_load.ntime = float(
-            self.table_widget.item(len(self.obj_load.delta) + 7, 1).text()
-        )
-        self.obj_load.EL_reach = float(
-            self.table_widget.item(len(self.obj_load.delta) + 13, 1).text()
-        )
-        self.obj_load.update_params()
-
-        self.fit_alg = self.table_widget.item(
-            len(self.obj_load.delta) + 8, 1
-        ).text()  # fitting algorithm
-        self.maxnfev = int(
-            self.table_widget.item(len(self.obj_load.delta) + 9, 1).text()
-        )  # max fitting steps
-        self.tolerance = float(
-            self.table_widget.item(len(self.obj_load.delta) + 10, 1).text()
-        )  # fitting tolerance
-        self.obj_load.T = float(
-            self.table_widget.item(len(self.obj_load.delta) + 11, 1).text()
-        )
-        self.obj_load.raman_maxcalc = float(
-            self.table_widget.item(len(self.obj_load.delta) + 12, 1).text()
-        )
+        self.apply_table_to_state()
 
     def clear_canvas(self):
         """Clear the canvas
@@ -524,6 +362,17 @@ class SpectrumApp(QMainWindow):
 
         if self.canvas3 is not None:
             self.canvas3.clear()  # Redraw the canvas to clear it
+
+    def reset_plot_items(self):
+        """Clear plot canvases and cached plot item references for a new dataset."""
+        self.clear_canvas()
+        self.raman_plot_items = []
+        self.rep_plot_items = []
+        self.rep_scatter_items = []
+        self.abs_plot_item = None
+        self.fl_plot_item = None
+        self.abs_exp_plot_item = None
+        self.fl_exp_plot_item = None
 
     def start_update_timer(self):
         """Start the timer to update the plot
@@ -598,6 +447,7 @@ class SpectrumApp(QMainWindow):
         """Update plots with calculated data using efficient setData calls
         """
         abs_cross, fl_cross, raman_cross, raman_spec = results
+        fl_exp_y = self.normalized_fl_exp_y(fl_cross)
         
         # 1. Update Raman Spectra (canvas2)
         if not self.raman_plot_items:
@@ -673,28 +523,40 @@ class SpectrumApp(QMainWindow):
             
             try:
                 self.abs_exp_plot_item = self.canvas3.plot(
-                    self.obj_load.convEL,
-                    self.obj_load.abs_exp[:, 1],
+                    self.obj_load.abs_exp_raw[:, 0],
+                    self.obj_load.abs_exp_raw[:, 1],
                     name="Abs expt.",
                     pen="blue",
                 )
             except: pass
             
             try:
-                self.fl_exp_plot_item = self.canvas3.plot(
-                    self.obj_load.convEL,
-                    self.obj_load.fl_exp[:, 1],
-                    name="FL expt.",
-                    pen="yellow",
-                )
+                if fl_exp_y is not None:
+                    self.fl_exp_plot_item = self.canvas3.plot(
+                        self.obj_load.fl_exp_raw[:, 0],
+                        fl_exp_y,
+                        name="FL expt.",
+                        pen="yellow",
+                    )
             except: pass
         else:
             self.abs_plot_item.setData(self.obj_load.convEL, np.real(abs_cross))
             self.fl_plot_item.setData(self.obj_load.convEL, np.real(fl_cross))
             if self.abs_exp_plot_item:
-                self.abs_exp_plot_item.setData(self.obj_load.convEL, self.obj_load.abs_exp[:, 1])
-            if self.fl_exp_plot_item:
-                self.fl_exp_plot_item.setData(self.obj_load.convEL, self.obj_load.fl_exp[:, 1])
+                self.abs_exp_plot_item.setData(self.obj_load.abs_exp_raw[:, 0], self.obj_load.abs_exp_raw[:, 1])
+            if self.fl_exp_plot_item and fl_exp_y is not None:
+                self.fl_exp_plot_item.setData(self.obj_load.fl_exp_raw[:, 0], fl_exp_y)
+
+    def normalized_fl_exp_y(self, fl_cross):
+        """Scale experimental fluorescence to the calculated fluorescence maximum."""
+        if not hasattr(self.obj_load, "fl_exp_raw"):
+            return None
+        raw = self.obj_load.fl_exp_raw[:, 1]
+        raw_max = np.max(raw)
+        calc_max = np.max(np.real(fl_cross))
+        if raw_max == 0 or calc_max == 0:
+            return raw
+        return raw * (calc_max / raw_max)
 
     def plot_data(self):
         """Old blocking plot_data, now redirects to trigger_calculation
@@ -706,23 +568,12 @@ class SpectrumApp(QMainWindow):
         """
         self.table_widget = QTableWidget()
         self.table_widget.setColumnCount(4)
-        self.table_widget.setRowCount(len(self.obj_load.delta) + 19)
         self.table_widget.setHorizontalHeaderLabels(
             ["Variables", "Values", "Plot Raman \nEx. Profile", "Fit?"]
         )
         self.table_widget.itemChanged.connect(self.update_spectrum)
-        self.obj2table()
+        self.render_table_from_state()
         print("Initialized. Files loaded from the working folder.")
-        # initialize parameters for ResRam Gui only
-        self.fit_alg = self.table_widget.item(
-            len(self.obj_load.delta) + 8, 1
-        ).text()  # fitting algorithm
-        self.maxnfev = int(
-            self.table_widget.item(len(self.obj_load.delta) + 9, 1).text()
-        )  # max fitting steps
-        self.tolerance = float(
-            self.table_widget.item(len(self.obj_load.delta) + 10, 1).text()
-        )  # fitting tolerance
         # Set headers to resize to contents
         self.table_widget.horizontalHeader().setSectionResizeMode(
             0, QHeaderView.ResizeMode.ResizeToContents
@@ -732,6 +583,15 @@ class SpectrumApp(QMainWindow):
         )
 
         self.right_layout.addWidget(self.table_widget)
+
+    def reset_table_for_loaded_data(self):
+        """Resize table state for the currently loaded dataset."""
+        self.plot_switch = np.ones(len(self.obj_load.delta) + 18)
+        self.fit_switch = np.ones(len(self.obj_load.delta) + 18)
+        self.fit_alg = "powell"
+        self.maxnfev = 100
+        self.tolerance = 0.00000001
+        self.render_table_from_state()
 
     def select_subfolder(self):
         """Select the subfolder
@@ -756,16 +616,9 @@ class SpectrumApp(QMainWindow):
                 )
                 return
             
-            # Reset plot item storage on folder change
-            self.raman_plot_items = []
-            self.rep_plot_items = []
-            self.rep_scatter_items = []
-            self.abs_plot_item = None
-            self.fl_plot_item = None
-            self.abs_exp_plot_item = None
-            self.fl_exp_plot_item = None
+            self.reset_plot_items()
             
-            self.sendto_table()
+            self.reset_table_for_loaded_data()
             self.refresh_dir_indicator()
             self.plot_data()
 
@@ -847,166 +700,171 @@ class SpectrumApp(QMainWindow):
         self.dir = get_default_example_dir()
         self.load_files()
         
-        # Reset plot item storage
-        self.raman_plot_items = []
-        self.rep_plot_items = []
-        self.rep_scatter_items = []
-        self.abs_plot_item = None
-        self.fl_plot_item = None
-        self.abs_exp_plot_item = None
-        self.fl_exp_plot_item = None
+        self.reset_plot_items()
         
-        self.obj2table()
+        self.reset_table_for_loaded_data()
         print("Initialized. Files loaded from the working folder.")
         self.plot_data()
         self.refresh_dir_indicator()
 
-    def obj2table(self):
-        """Convert the object to a table
-        """
-        self.table_widget.itemChanged.disconnect(self.update_spectrum)
-        for row in range(len(self.obj_load.delta)):
-            item = QTableWidgetItem(f"{self.obj_load.delta[row]:.4f}")
-            label = QTableWidgetItem(f"delta@{self.obj_load.wg[row]:.2f} cm-1")
-            self.table_widget.setItem(row, 0, label)
-            self.table_widget.setItem(row, 1, item)
-            
-            # Plot checkbox
-            plot_item = QTableWidgetItem()
-            plot_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-            plot_item.setCheckState(Qt.CheckState.Checked)
-            self.table_widget.setItem(row, 2, plot_item)
-            
-            # Fit checkbox
-            fit_item = QTableWidgetItem()
-            fit_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-            fit_item.setCheckState(Qt.CheckState.Checked)
-            self.table_widget.setItem(row, 3, fit_item)
+    def table_param_rows(self):
+        """Return parameter rows after the mode rows."""
+        return [
+            ("gamma", "gamma", self.obj_load.gamma, len(self.obj_load.delta)),
+            ("M", "Transition Length (A)", self.obj_load.M, len(self.obj_load.delta) + 1),
+            ("theta", "theta", self.obj_load.theta, len(self.obj_load.delta) + 2),
+            ("kappa", "kappa", self.obj_load.k, len(self.obj_load.delta) + 3),
+            ("n", "Refractive Index", self.obj_load.n, None),
+            ("E0", "E00", self.obj_load.E0, len(self.obj_load.delta) + 5),
+            ("ts", "Time step (ps)", self.obj_load.ts, None),
+            ("ntime", "Time step number", self.obj_load.ntime, None),
+            ("fit_alg", "Fitting algorithm", self.fit_alg, None),
+            ("maxnfev", "Fitting maxnfev", self.maxnfev, None),
+            ("tolerance", "Fitting tolerance", self.tolerance, None),
+            ("T", "Temp (K)", self.obj_load.T, None),
+            ("raman_maxcalc", "Raman maxcalc", getattr(self.obj_load, "raman_maxcalc", self.obj_load.inp[10]), None),
+            ("EL_reach", "EL reach", getattr(self.obj_load, "EL_reach", self.obj_load.inp[6]), None),
+        ]
 
-        self.table_widget.setItem(
-            len(self.obj_load.delta), 0, QTableWidgetItem("gamma")
+    def row_for_key(self, key: str) -> int:
+        """Return the current table row for a stable row key."""
+        for row in range(self.table_widget.rowCount()):
+            item = self.table_widget.item(row, 0)
+            if item is not None and item.data(Qt.ItemDataRole.UserRole) == key:
+                return row
+        raise KeyError(key)
+
+    def set_keyed_item(self, row: int, column: int, text: str, key: str | None = None):
+        item = QTableWidgetItem(text)
+        if key is not None:
+            item.setData(Qt.ItemDataRole.UserRole, key)
+        self.table_widget.setItem(row, column, item)
+        return item
+
+    def set_check_item(self, row: int, column: int, checked: bool | None):
+        item = QTableWidgetItem()
+        if checked is None:
+            item.setText("N/A")
+            item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+        else:
+            item.setFlags(
+                Qt.ItemFlag.ItemIsUserCheckable
+                | Qt.ItemFlag.ItemIsEnabled
+                | Qt.ItemFlag.ItemIsSelectable
+            )
+            item.setCheckState(Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked)
+        self.table_widget.setItem(row, column, item)
+        return item
+
+    def ensure_switch_lengths(self):
+        needed = len(self.obj_load.delta) + 18
+        if len(self.plot_switch) != needed:
+            self.plot_switch = np.ones(needed)
+        if len(self.fit_switch) != needed:
+            self.fit_switch = np.ones(needed)
+
+    def render_table_from_state(self):
+        """Render a complete table snapshot from obj_load and GUI control state."""
+        self.ensure_switch_lengths()
+        rows = len(self.obj_load.delta) + len(self.table_param_rows())
+        was_blocked = self.table_widget.blockSignals(True)
+        try:
+            self.table_widget.clearContents()
+            self.table_widget.setRowCount(rows)
+
+            for row in range(len(self.obj_load.delta)):
+                key = f"delta:{row}"
+                self.set_keyed_item(row, 0, f"delta@{self.obj_load.wg[row]:.2f} cm-1", key)
+                self.set_keyed_item(row, 1, f"{self.obj_load.delta[row]:.4f}")
+                self.set_check_item(row, 2, self.plot_switch[row] == 1)
+                self.set_check_item(row, 3, self.fit_switch[row] == 1)
+
+            start = len(self.obj_load.delta)
+            for offset, (key, label, value, fit_index) in enumerate(self.table_param_rows()):
+                row = start + offset
+                self.set_keyed_item(row, 0, label, key)
+                self.set_keyed_item(row, 1, str(value))
+                self.set_check_item(row, 2, None)
+                if fit_index is None:
+                    self.set_check_item(row, 3, None)
+                else:
+                    self.set_check_item(row, 3, self.fit_switch[fit_index] == 1)
+        finally:
+            self.table_widget.blockSignals(was_blocked)
+
+    def table_text(self, key: str) -> str:
+        item = self.table_widget.item(self.row_for_key(key), 1)
+        return "" if item is None else item.text()
+
+    def restore_table_value(self, key: str, value):
+        row = self.row_for_key(key)
+        was_blocked = self.table_widget.blockSignals(True)
+        try:
+            self.set_keyed_item(row, 1, str(value))
+        finally:
+            self.table_widget.blockSignals(was_blocked)
+
+    def read_float_value(self, key: str, current_value):
+        text = self.table_text(key)
+        try:
+            return float(text)
+        except ValueError:
+            print(f"Invalid numeric value for {key}: {text!r}. Restoring {current_value}.")
+            self.restore_table_value(key, current_value)
+            return current_value
+
+    def read_int_value(self, key: str, current_value: int):
+        text = self.table_text(key)
+        try:
+            return int(text)
+        except ValueError:
+            print(f"Invalid integer value for {key}: {text!r}. Restoring {current_value}.")
+            self.restore_table_value(key, current_value)
+            return current_value
+
+    def check_state_for_key(self, key: str, column: int) -> bool:
+        item = self.table_widget.item(self.row_for_key(key), column)
+        return item is not None and item.checkState() == Qt.CheckState.Checked
+
+    def apply_table_to_state(self):
+        """Apply editable table values back to obj_load using stable row keys."""
+        self.ensure_switch_lengths()
+
+        for i in range(len(self.obj_load.delta)):
+            key = f"delta:{i}"
+            self.obj_load.delta[i] = self.read_float_value(key, self.obj_load.delta[i])
+            self.plot_switch[i] = 1 if self.check_state_for_key(key, 2) else 0
+            self.fit_switch[i] = 1 if self.check_state_for_key(key, 3) else 0
+
+        self.obj_load.gamma = self.read_float_value("gamma", self.obj_load.gamma)
+        self.fit_switch[len(self.obj_load.delta)] = 1 if self.check_state_for_key("gamma", 3) else 0
+        self.obj_load.M = self.read_float_value("M", self.obj_load.M)
+        self.fit_switch[len(self.obj_load.delta) + 1] = 1 if self.check_state_for_key("M", 3) else 0
+        self.obj_load.theta = self.read_float_value("theta", self.obj_load.theta)
+        self.fit_switch[len(self.obj_load.delta) + 2] = 1 if self.check_state_for_key("theta", 3) else 0
+        self.obj_load.k = self.read_float_value("kappa", self.obj_load.k)
+        self.fit_switch[len(self.obj_load.delta) + 3] = 1 if self.check_state_for_key("kappa", 3) else 0
+        self.obj_load.n = self.read_float_value("n", self.obj_load.n)
+        self.obj_load.E0 = self.read_float_value("E0", self.obj_load.E0)
+        self.fit_switch[len(self.obj_load.delta) + 5] = 1 if self.check_state_for_key("E0", 3) else 0
+        self.obj_load.ts = self.read_float_value("ts", self.obj_load.ts)
+        self.obj_load.ntime = self.read_float_value("ntime", self.obj_load.ntime)
+        self.obj_load.T = self.read_float_value("T", self.obj_load.T)
+        self.obj_load.raman_maxcalc = self.read_float_value(
+            "raman_maxcalc", getattr(self.obj_load, "raman_maxcalc", float(self.obj_load.inp[10]))
         )
-        self.table_widget.setItem(
-            len(self.obj_load.delta), 1, QTableWidgetItem(str(self.obj_load.inp[0]))
+        self.obj_load.EL_reach = self.read_float_value(
+            "EL_reach", getattr(self.obj_load, "EL_reach", float(self.obj_load.inp[6]))
         )
-        gamma_fit = QTableWidgetItem()
-        gamma_fit.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-        gamma_fit.setCheckState(Qt.CheckState.Checked)
-        self.table_widget.setItem(len(self.obj_load.delta), 3, gamma_fit)
-        
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 1, 0, QTableWidgetItem("Transition Length (A)")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 1, 1, QTableWidgetItem(str(self.obj_load.inp[7]))
-        )
-        m_fit = QTableWidgetItem()
-        m_fit.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-        m_fit.setCheckState(Qt.CheckState.Checked)
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 1, 3, m_fit
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 2, 0, QTableWidgetItem("theta")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 2, 1, QTableWidgetItem(str(self.obj_load.inp[1]))
-        )
-        theta_fit = QTableWidgetItem()
-        theta_fit.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-        theta_fit.setCheckState(Qt.CheckState.Checked)
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 2, 3, theta_fit
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 3, 0, QTableWidgetItem("kappa")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 3, 1, QTableWidgetItem(str(self.obj_load.inp[3]))
-        )
-        kappa_fit = QTableWidgetItem()
-        kappa_fit.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-        kappa_fit.setCheckState(Qt.CheckState.Unchecked)
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 3, 3, kappa_fit
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 4, 0, QTableWidgetItem("Refractive Index")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 4, 1, QTableWidgetItem(str(self.obj_load.inp[8]))
-        )
-        # N/A check
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 4, 3, QTableWidgetItem("N/A")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 5, 0, QTableWidgetItem("E00")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 5, 1, QTableWidgetItem(str(self.obj_load.inp[2]))
-        )
-        e0_fit = QTableWidgetItem()
-        e0_fit.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-        e0_fit.setCheckState(Qt.CheckState.Unchecked)
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 5, 3, e0_fit
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 6, 0, QTableWidgetItem("Time step (ps)")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 6, 1, QTableWidgetItem(str(self.obj_load.inp[4]))
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 7, 0, QTableWidgetItem("Time step number")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 7, 1, QTableWidgetItem(str(self.obj_load.inp[5]))
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 8, 0, QTableWidgetItem("Fitting algorithm")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 8, 1, QTableWidgetItem("powell")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 9, 0, QTableWidgetItem("Fitting maxnfev")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 9, 1, QTableWidgetItem("100")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 10, 0, QTableWidgetItem("Fitting tolerance")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 10, 1, QTableWidgetItem("0.00000001")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 11, 0, QTableWidgetItem("Temp (K)")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 11,
-            1,
-            QTableWidgetItem(str(self.obj_load.inp[13])),
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 12, 0, QTableWidgetItem("Raman maxcalc")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 12,
-            1,
-            QTableWidgetItem(str(self.obj_load.inp[10])),
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 13, 0, QTableWidgetItem("EL reach")
-        )
-        self.table_widget.setItem(
-            len(self.obj_load.delta) + 13,
-            1,
-            QTableWidgetItem(str(self.obj_load.inp[6])),
-        )
-        self.table_widget.itemChanged.connect(self.update_spectrum)
+        self.fit_alg = self.table_text("fit_alg") or self.fit_alg
+        self.maxnfev = self.read_int_value("maxnfev", self.maxnfev)
+        self.tolerance = self.read_float_value("tolerance", self.tolerance)
+        self.obj_load.update_params()
+        self.obj_load.update_experimental_interpolants()
+
+    def obj2table(self):
+        """Compatibility wrapper for older table refresh call sites."""
+        self.render_table_from_state()
 
     """
     def update_data(self):#nouse
