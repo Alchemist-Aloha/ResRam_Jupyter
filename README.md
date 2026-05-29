@@ -61,7 +61,7 @@ This project includes an optional **Rust backend** (`src/resram_rust`) that prov
 1. **Install Rust:** [rustup.rs](https://rustup.rs/)
 2. **Install Maturin**
    ```bash
-   uv pip install '.[rust]'
+   uv pip install maturin
    ```
 3. **Build wheel:**
    ```bash
