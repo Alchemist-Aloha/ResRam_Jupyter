@@ -1,11 +1,11 @@
-from resram_ng.resram_core import load_input, resram_data, param_init, raman_residual, run_save
+from resram_ng.resram_core import load_input, resram_data, param_init, raman_residual, run_save, HAS_RUST
 from tqdm import tqdm
 import time
 from datetime import datetime
 import numpy as np
 import lmfit
 import matplotlib.pyplot as plt
-
+print(f"HAS_RUST: {HAS_RUST}")
 # Initialize the 'fit_obj' object of class 'load_input'.
 # Load from input files in root dir or specified dir.
 fit_obj = load_input() 
