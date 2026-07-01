@@ -120,8 +120,11 @@ def test_gui_table_contains_only_loaded_folder_delta_rows():
             if window.table_widget.item(row, 0) is not None
         ]
         delta_labels = [label for label in labels if label.startswith("delta@")]
+        expected_rows = len(window.obj_load.wg) + len(window.table_param_rows())
         print("ROWS", window.table_widget.rowCount())
+        print("EXPECTED_ROWS", expected_rows)
         print("DELTAS", len(delta_labels))
+        print("EXPECTED_DELTAS", len(window.obj_load.wg))
         print("MAXNFEV_LABEL", window.table_widget.item(window.row_for_key("maxnfev"), 0).text())
         print("MAXNFEV_VALUE", window.table_widget.item(window.row_for_key("maxnfev"), 1).text())
         window.close()
@@ -132,8 +135,12 @@ def test_gui_table_contains_only_loaded_folder_delta_rows():
     result = run_python(script)
 
     assert result.returncode == 0, result.stderr
-    assert "ROWS 25" in result.stdout
-    assert "DELTAS 11" in result.stdout
+    rows_line = next(line for line in result.stdout.splitlines() if line.startswith("ROWS "))
+    expected_rows_line = next(line for line in result.stdout.splitlines() if line.startswith("EXPECTED_ROWS "))
+    deltas_line = next(line for line in result.stdout.splitlines() if line.startswith("DELTAS "))
+    expected_deltas_line = next(line for line in result.stdout.splitlines() if line.startswith("EXPECTED_DELTAS "))
+    assert rows_line.replace("ROWS", "EXPECTED_ROWS", 1) == expected_rows_line
+    assert deltas_line.replace("DELTAS", "EXPECTED_DELTAS", 1) == expected_deltas_line
     assert "MAXNFEV_LABEL Fitting maxnfev" in result.stdout
     assert "MAXNFEV_VALUE 100" in result.stdout
 
@@ -169,7 +176,7 @@ def test_gui_table_rebuilds_cleanly_from_smaller_to_larger_folder():
     result = run_python(script)
 
     assert result.returncode == 0, result.stderr
-    assert "ROWS 40" in result.stdout
+    assert "ROWS 43" in result.stdout
     assert "DELTAS 26" in result.stdout
     assert "MAXNFEV_VALUE 100" in result.stdout
 
@@ -197,6 +204,31 @@ def test_gui_invalid_numeric_edit_does_not_crash_or_replace_state():
     assert result.returncode == 0, result.stderr
     assert "MAXNFEV 100" in result.stdout
     assert "CELL 100" in result.stdout
+
+
+def test_gui_table_edits_apply_loss_coefficients_to_model():
+    script = textwrap.dedent(
+        """
+        from PyQt6.QtWidgets import QApplication, QTableWidgetItem
+        from resram_ng.ResRamQt import SpectrumApp
+
+        app = QApplication([])
+        window = SpectrumApp()
+        window.render_table_from_state()
+        window.table_widget.setItem(window.row_for_key("loss_total_sigma"), 1, QTableWidgetItem("0.5"))
+        window.table_widget.setItem(window.row_for_key("loss_abs_corr"), 1, QTableWidgetItem("7.0"))
+        window.table_widget.setItem(window.row_for_key("loss_fl_corr"), 1, QTableWidgetItem("11.0"))
+        window.load_table()
+        print("LOSS_COEFFICIENTS", ",".join(f"{x:.1f}" for x in window.obj_load.loss_coefficients))
+        window.close()
+        app.quit()
+        """
+    )
+
+    result = run_python(script)
+
+    assert result.returncode == 0, result.stderr
+    assert "LOSS_COEFFICIENTS 0.5,7.0,11.0" in result.stdout
 
 
 def test_gui_table_edits_apply_to_model_by_key():
@@ -233,6 +265,72 @@ def test_gui_table_edits_apply_to_model_by_key():
     assert "DELTA0 0.1234" in result.stdout
     assert "PLOT0 0" in result.stdout
     assert "FIT_GAMMA 0" in result.stdout
+
+
+def test_raman_residual_uses_configurable_loss_coefficients():
+    script = textwrap.dedent(
+        """
+        import os
+        import numpy as np
+        import lmfit
+
+        os.environ["RESRAM_DISABLE_RUST"] = "1"
+        import resram_ng.resram_core as core
+
+        class FakeFitObject:
+            def __init__(self):
+                self.delta = np.array([0.1, 0.2])
+                self.gamma = 1.0
+                self.M = 2.0
+                self.k = 0.3
+                self.theta = 0.4
+                self.E0 = 1000.0
+                self.order = 1
+                self.abs_exp = np.array([[0.0, 1.0], [1.0, 2.0], [2.0, 3.0], [3.0, 4.0]])
+                self.fl_exp = np.array([[0.0, 4.0], [1.0, 3.0], [2.0, 2.0], [3.0, 1.0]])
+                self.profs_exp = np.zeros((2, 2))
+                self.rp = np.array([0, 2])
+                self.loss_coefficients = np.array([0.0, 2.0, 5.0])
+                self.loss_list = []
+                self.correlation_list = []
+                self.sigma_list = []
+
+            def update_params(self):
+                pass
+
+        def fake_cross_sections(obj):
+            obj.abs_cross = np.array([1.0, 2.0, 3.0, 4.0])
+            obj.fl_cross = np.array([1.0, 2.0, 3.0, 4.0])
+            obj.raman_cross = np.array([[1.0, 0.0, 2.0], [3.0, 0.0, 4.0]])
+
+        core.cross_sections = fake_cross_sections
+
+        params = lmfit.Parameters()
+        params.add("delta0", value=0.1)
+        params.add("delta1", value=0.2)
+        params.add("gamma", value=1.0)
+        params.add("transition_length", value=2.0)
+        params.add("kappa", value=0.3)
+        params.add("theta", value=0.4)
+        params.add("E0", value=1000.0)
+
+        obj = FakeFitObject()
+        loss, sigma, mismatch = core.raman_residual(params, obj)
+        print("LOSS", f"{loss:.1f}")
+        print("SIGMA", f"{sigma:.1f}")
+        print("ABS_CORR", f"{obj.correlation:.1f}")
+        print("FL_CORR", f"{obj.fl_correlation:.1f}")
+        print("MISMATCH", f"{mismatch:.1f}")
+        """
+    )
+
+    result = run_python(script)
+
+    assert result.returncode == 0, result.stderr
+    assert "LOSS 10.0" in result.stdout
+    assert "ABS_CORR 1.0" in result.stdout
+    assert "FL_CORR -1.0" in result.stdout
+    assert "MISMATCH 200.0" in result.stdout
 
 
 def test_raman_excitation_canvas_clears_old_folder_items_on_load():
@@ -274,8 +372,9 @@ def test_raman_excitation_canvas_clears_old_folder_items_on_load():
     result = run_python(script)
 
     assert result.returncode == 0, result.stderr
-    assert "EXPECTED 33" in result.stdout
-    assert "ACTUAL 33" in result.stdout
+    expected_line = next(line for line in result.stdout.splitlines() if line.startswith("EXPECTED "))
+    actual_line = next(line for line in result.stdout.splitlines() if line.startswith("ACTUAL "))
+    assert expected_line.replace("EXPECTED", "ACTUAL", 1) == actual_line
 
 
 def test_experimental_abs_fl_raw_axes_do_not_follow_e00():

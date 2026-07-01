@@ -52,6 +52,7 @@ from .resram_core import (
     resram_data,
     param_init,
     raman_residual,
+    ensure_loss_coefficients,
     run_save,
 )
 
@@ -709,6 +710,7 @@ class SpectrumApp(QMainWindow):
 
     def table_param_rows(self):
         """Return parameter rows after the mode rows."""
+        loss_coefficients = ensure_loss_coefficients(self.obj_load)
         return [
             ("gamma", "gamma", self.obj_load.gamma, len(self.obj_load.delta)),
             ("M", "Transition Length (A)", self.obj_load.M, len(self.obj_load.delta) + 1),
@@ -724,6 +726,9 @@ class SpectrumApp(QMainWindow):
             ("T", "Temp (K)", self.obj_load.T, None),
             ("raman_maxcalc", "Raman maxcalc", getattr(self.obj_load, "raman_maxcalc", self.obj_load.inp[10]), None),
             ("EL_reach", "EL reach", getattr(self.obj_load, "EL_reach", self.obj_load.inp[6]), None),
+            ("loss_total_sigma", "Loss coeff total_sigma", loss_coefficients[0], None),
+            ("loss_abs_corr", "Loss coeff (1-abs_corr)", loss_coefficients[1], None),
+            ("loss_fl_corr", "Loss coeff (1-fl_corr)", loss_coefficients[2], None),
         ]
 
     def row_for_key(self, key: str) -> int:
@@ -859,6 +864,14 @@ class SpectrumApp(QMainWindow):
         self.fit_alg = self.table_text("fit_alg") or self.fit_alg
         self.maxnfev = self.read_int_value("maxnfev", self.maxnfev)
         self.tolerance = self.read_float_value("tolerance", self.tolerance)
+        self.obj_load.loss_coefficients = np.array(
+            [
+                self.read_float_value("loss_total_sigma", self.obj_load.loss_coefficients[0]),
+                self.read_float_value("loss_abs_corr", self.obj_load.loss_coefficients[1]),
+                self.read_float_value("loss_fl_corr", self.obj_load.loss_coefficients[2]),
+            ],
+            dtype=float,
+        )
         self.obj_load.update_params()
         self.obj_load.update_experimental_interpolants()
 

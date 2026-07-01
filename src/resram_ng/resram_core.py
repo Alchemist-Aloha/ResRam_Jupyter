@@ -31,6 +31,8 @@ from scipy.special import factorial
 from matplotlib.colors import ListedColormap
 import lmfit
 
+DEFAULT_LOSS_COEFFICIENTS = np.array([1.0, 30.0, 30.0], dtype=float)
+
 if os.environ.get("RESRAM_DISABLE_RUST", "").lower() in {"1", "true", "yes", "on"}:
     resram_rust = None
     HAS_RUST = False
@@ -51,6 +53,21 @@ else:
 def get_default_example_dir() -> str:
     """Return the package-relative example data directory."""
     return str((Path(__file__).resolve().parent / "example"))
+
+
+def ensure_loss_coefficients(obj):
+    """Return the three loss coefficients, adding defaults to older objects."""
+    coeffs = np.asarray(
+        getattr(obj, "loss_coefficients", DEFAULT_LOSS_COEFFICIENTS),
+        dtype=float,
+    )
+    if coeffs.shape != (3,):
+        raise ValueError(
+            "loss_coefficients must contain three values: "
+            "[total_sigma, 1 - abs_corr, 1 - fl_corr]"
+        )
+    obj.loss_coefficients = coeffs
+    return coeffs
 
 
 
@@ -170,9 +187,12 @@ class load_input:
         ) = None, None, None, None, None
         self.sigma = np.zeros_like(self.delta)  # Raman cross sections per mode
         self.correlation = None  # Correlation between calc and expt absorption
+        self.fl_correlation = None  # Correlation between calc and expt fluorescence
+        self.loss_coefficients = DEFAULT_LOSS_COEFFICIENTS.copy()
         self.total_sigma = None  # Total Raman cross section
         self.loss = None
         self.correlation_list = []
+        self.fl_correlation_list = []
         self.sigma_list = []
         self.loss_list = []
 
@@ -1193,13 +1213,14 @@ def raman_residual(param, fit_obj=None):
     Calculates the 'loss' which is a combination of:
     1. Residual sum of squares for Raman excitation profiles.
     2. Correlation between calculated and experimental absorption spectra.
+    3. Correlation between calculated and experimental fluorescence spectra.
 
     Args:
         param: lmfit.Parameters object.
         fit_obj: load_input object.
 
     Returns:
-        tuple: (total_loss, total_raman_sigma, absorption_mismatch)
+        tuple: (total_loss, total_raman_sigma, spectral_mismatch)
     """
     if fit_obj is None:
         fit_obj = load_input()
@@ -1215,47 +1236,55 @@ def raman_residual(param, fit_obj=None):
     fit_obj.E0 = param.valuesdict()["E0"]
 
     fit_obj.update_params()
+    loss_coefficients = ensure_loss_coefficients(fit_obj)
 
     if HAS_RUST and fit_obj.order == 1:
         if fit_obj.profs_exp.ndim == 1:
             fit_obj.profs_exp = np.reshape(fit_obj.profs_exp, (-1, 1))
-        
-        loss, sigma, mismatch = resram_rust.raman_residual_rust(
-            fit_obj.wg,
-            fit_obj.eta,
-            fit_obj.delta,
-            fit_obj.th,
-            fit_obj.EL,
-            fit_obj.convEL,
-            fit_obj.E0_range,
-            fit_obj.abs_exp[:, 1],
-            fit_obj.profs_exp,
-            fit_obj.rp.astype(np.uintp),
-            fit_obj.gamma,
-            fit_obj.M,
-            fit_obj.k,
-            fit_obj.theta,
-            fit_obj.E0,
-            fit_obj.beta,
-            fit_obj.preA,
-            fit_obj.preF,
-            fit_obj.preR,
-            fit_obj.ts,
-        )
-        fit_obj.loss = loss
-        fit_obj.total_sigma = sigma
-        fit_obj.correlation = 1.0 - mismatch / 100.0
+        try:
+            loss, sigma, mismatch, abs_corr, fl_corr = resram_rust.raman_residual_rust(
+                fit_obj.wg,
+                fit_obj.eta,
+                fit_obj.delta,
+                fit_obj.th,
+                fit_obj.EL,
+                fit_obj.convEL,
+                fit_obj.E0_range,
+                fit_obj.abs_exp[:, 1],
+                fit_obj.fl_exp[:, 1],
+                fit_obj.profs_exp,
+                fit_obj.rp.astype(np.uintp),
+                loss_coefficients,
+                fit_obj.gamma,
+                fit_obj.M,
+                fit_obj.k,
+                fit_obj.theta,
+                fit_obj.E0,
+                fit_obj.beta,
+                fit_obj.preA,
+                fit_obj.preF,
+                fit_obj.preR,
+                fit_obj.ts,
+            )
+            fit_obj.loss = loss
+            fit_obj.total_sigma = sigma
+            fit_obj.correlation = abs_corr
+            fit_obj.fl_correlation = fl_corr
 
-        # Track history
-        if not hasattr(fit_obj, 'loss_list'): fit_obj.loss_list = []
-        if not hasattr(fit_obj, 'correlation_list'): fit_obj.correlation_list = []
-        if not hasattr(fit_obj, 'sigma_list'): fit_obj.sigma_list = []
-        
-        fit_obj.loss_list.append(fit_obj.loss)
-        fit_obj.correlation_list.append(fit_obj.correlation)
-        fit_obj.sigma_list.append(fit_obj.total_sigma)
-        # print("Rust optimization step: Loss =", fit_obj.loss, "Sigma =", fit_obj.total_sigma, "Correlation =", fit_obj.correlation)
-        return fit_obj.loss, fit_obj.total_sigma, mismatch
+            # Track history
+            if not hasattr(fit_obj, 'loss_list'): fit_obj.loss_list = []
+            if not hasattr(fit_obj, 'correlation_list'): fit_obj.correlation_list = []
+            if not hasattr(fit_obj, 'fl_correlation_list'): fit_obj.fl_correlation_list = []
+            if not hasattr(fit_obj, 'sigma_list'): fit_obj.sigma_list = []
+            
+            fit_obj.loss_list.append(fit_obj.loss)
+            fit_obj.correlation_list.append(fit_obj.correlation)
+            fit_obj.fl_correlation_list.append(fit_obj.fl_correlation)
+            fit_obj.sigma_list.append(fit_obj.total_sigma)
+            # print("Rust optimization step: Loss =", fit_obj.loss, "Sigma =", fit_obj.total_sigma, "Correlation =", fit_obj.correlation)
+            return fit_obj.loss, fit_obj.total_sigma, mismatch
+        except TypeError:
+            pass
 
     # Run calculation with new parameters
     cross_sections(fit_obj)
@@ -1263,6 +1292,9 @@ def raman_residual(param, fit_obj=None):
     # Calculate absorption correlation
     fit_obj.correlation = np.corrcoef(
         np.real(fit_obj.abs_cross), fit_obj.abs_exp[:, 1]
+    )[0, 1]
+    fit_obj.fl_correlation = np.corrcoef(
+        np.real(fit_obj.fl_cross), fit_obj.fl_exp[:, 1]
     )[0, 1]
 
     # Calculate Raman residual
@@ -1276,8 +1308,13 @@ def raman_residual(param, fit_obj=None):
     fit_obj.sigma += intermediate.sum(axis=1)
     fit_obj.total_sigma = np.sum(fit_obj.sigma)
 
-    # Total loss = Raman RSS + weighted absorption mismatch
-    fit_obj.loss = fit_obj.total_sigma + 30 * (1 - fit_obj.correlation)
+    abs_mismatch = 1 - fit_obj.correlation
+    fl_mismatch = 1 - fit_obj.fl_correlation
+    fit_obj.loss = (
+        loss_coefficients[0] * fit_obj.total_sigma
+        + loss_coefficients[1] * abs_mismatch
+        + loss_coefficients[2] * fl_mismatch
+    )
 
     # Track history
     if fit_obj.loss_list == []:
@@ -1288,12 +1325,16 @@ def raman_residual(param, fit_obj=None):
         fit_obj.correlation_list = [fit_obj.correlation]
     else:
         fit_obj.correlation_list.append(fit_obj.correlation)
+    if not hasattr(fit_obj, "fl_correlation_list") or fit_obj.fl_correlation_list == []:
+        fit_obj.fl_correlation_list = [fit_obj.fl_correlation]
+    else:
+        fit_obj.fl_correlation_list.append(fit_obj.fl_correlation)
     if fit_obj.sigma_list == []:
         fit_obj.sigma_list = [fit_obj.total_sigma]
     else:
         fit_obj.sigma_list.append(fit_obj.total_sigma)
     # print("Optimization step: Loss =", fit_obj.loss, "Sigma =", fit_obj.total_sigma, "Correlation =", fit_obj.correlation)
-    return fit_obj.loss, fit_obj.total_sigma, 100 * (1 - fit_obj.correlation)
+    return fit_obj.loss, fit_obj.total_sigma, 100 * (abs_mismatch + fl_mismatch)
 
 
 def param_init(fit_switch, obj=None):

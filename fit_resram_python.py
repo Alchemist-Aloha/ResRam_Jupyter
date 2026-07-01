@@ -32,7 +32,7 @@ raman_residual(params_lmfit, fit_obj)
 print(f"Initial correlation: {fit_obj.correlation}")
 
 fit_kws = dict(tol=1e-10)    # Set fitting tolerance
-max_nfev = 100    # Set maximum number of function evaluations
+max_nfev = 1000    # Set maximum number of function evaluations
 
 # Initialize tqdm progress bar for fitting process
 with tqdm(total=max_nfev, desc="Fitting progress") as pbar:
