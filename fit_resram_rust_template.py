@@ -26,22 +26,41 @@ for name in params_lmfit.keys():
 raman_residual(params_lmfit, fit_obj)
 print(f"Initial correlation: {fit_obj.correlation}")
 
-fit_kws = dict(tol=1e-10)    # Set fitting tolerance
-max_nfev = 1000000    # Set maximum number of function evaluations
+# fit with powell method
+# fit_kws = dict(tol=1e-10)    # Set fitting tolerance
+# max_nfev = 1000000    # Set maximum number of function evaluations
 
-# Initialize tqdm progress bar for fitting process
+# # Initialize tqdm progress bar for fitting process
+# with tqdm(total=max_nfev, desc="Fitting progress") as pbar:
+#     def update_progress(params, iteration, resid, *args, **kwargs):
+#         pbar.update(1)
+#         try:
+#             pbar.set_description(
+#                 f"Iteration {iteration}, Loss: {resid[0]:.6f}, Abs_corr: {fit_obj.correlation:.6f}, Fl_corr: {fit_obj.fl_correlation:.6f}")
+#         except Exception:
+#             pass
+
+#     # Perform the fitting using lmfit.minimize function
+#     result = lmfit.minimize(raman_residual, params_lmfit, args=(fit_obj,), method='powell', **fit_kws,
+#                             max_nfev=max_nfev, iter_cb=update_progress)
+
+# fit with nelder (Nelder-Mead simplex) method — works with scalar residuals
+max_nfev=1000000
 with tqdm(total=max_nfev, desc="Fitting progress") as pbar:
     def update_progress(params, iteration, resid, *args, **kwargs):
         pbar.update(1)
         try:
             pbar.set_description(
-                f"Iteration {iteration}, Loss: {resid[0]:.6f}, Abs_corr: {fit_obj.correlation:.6f}")
+                f"Iteration {iteration}, Loss: {resid[0]:.6f}, Abs_corr: {fit_obj.correlation:.6f}, Fl_corr: {fit_obj.fl_correlation:.6f}")
         except Exception:
             pass
 
     # Perform the fitting using lmfit.minimize function
-    result = lmfit.minimize(raman_residual, params_lmfit, args=(fit_obj,), method='cobyla', **fit_kws,
-                            max_nfev=max_nfev, iter_cb=update_progress)
+    result = lmfit.minimize(raman_residual, params_lmfit, args=(fit_obj,), method='nelder', max_nfev=max_nfev, iter_cb=update_progress,tol=1e-10)
+
+# fit with emcee (MCMC) method, but it is commented out for now. You can uncomment the following lines to use emcee for fitting.
+# fit_kws = dict(nwalkers=150, steps=2000, progress=True)    # emcee has its own progress bar
+# result = lmfit.minimize(raman_residual, params_lmfit, args=(fit_obj,), method='emcee', **fit_kws)
 
 print(lmfit.fit_report(result))
 
